@@ -246,7 +246,7 @@ with col2:
     """.format(minutes), unsafe_allow_html=True)
 
 with col3:
-    bot_messages = len([msg for role, msg in st.session_state['chat_history'] if role == "Bot"])
+    bot_messages = len([msg for role, msg, timestamp in st.session_state['chat_history'] if role == "Bot"])
     st.markdown("""
     <div class="stat-item">
         <div class="stat-number">{}</div>
@@ -259,15 +259,13 @@ st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
 # Display chat history
 if st.session_state['chat_history']:
-    for i, (role, text) in enumerate(st.session_state['chat_history']):
-        timestamp = datetime.now().strftime("%H:%M")
+    for i, (role, text, timestamp) in enumerate(st.session_state['chat_history']):
         if role == "You":
             st.markdown(f"""
             <div class="user-message">
                 {text}
                 <div class="timestamp">{timestamp}</div>
             </div>
-            <div class="clearfix"></div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
@@ -275,7 +273,6 @@ if st.session_state['chat_history']:
                 {text}
                 <div class="timestamp">🤖 {timestamp}</div>
             </div>
-            <div class="clearfix"></div>
             """, unsafe_allow_html=True)
 else:
     # Welcome message
@@ -284,7 +281,6 @@ else:
         👋 Hello! I'm your Gemini AI assistant. How can I help you today?
         <div class="timestamp">🤖 Ready</div>
     </div>
-    <div class="clearfix"></div>
     """, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -292,23 +288,26 @@ st.markdown('</div>', unsafe_allow_html=True)
 # Input section
 st.markdown("### 💭 What's on your mind?")
 
-col1, col2 = st.columns([4, 1])
-
-with col1:
-    user_input = st.text_input(
-        label="Message", 
-        placeholder="Type your message here...",
-        key="user_input",
-        label_visibility="collapsed"
-    )
-
-with col2:
-    send_button = st.button("Send 🚀", use_container_width=True)
+# Use form to enable Enter key functionality
+with st.form(key="chat_form", clear_on_submit=True):
+    col1, col2 = st.columns([4, 1])
+    
+    with col1:
+        user_input = st.text_input(
+            label="Message", 
+            placeholder="Type your message here...",
+            key="user_input_field",
+            label_visibility="collapsed"
+        )
+    
+    with col2:
+        send_button = st.form_submit_button("Send 🚀", use_container_width=True)
 
 # Handle input submission
-if send_button and user_input.strip():
-    # Add user message
-    st.session_state['chat_history'].append(("You", user_input.strip()))
+if send_button and user_input and user_input.strip():
+    # Add user message with timestamp
+    current_time = datetime.now().strftime("%H:%M")
+    st.session_state['chat_history'].append(("You", user_input.strip(), current_time))
     
     # Show typing indicator
     with st.container():
@@ -343,13 +342,16 @@ if send_button and user_input.strip():
         response_placeholder.empty()
         
         if full_response:
-            st.session_state['chat_history'].append(("Bot", full_response))
+            bot_time = datetime.now().strftime("%H:%M")
+            st.session_state['chat_history'].append(("Bot", full_response, bot_time))
         else:
-            st.session_state['chat_history'].append(("Bot", "Sorry, I couldn't generate a response. Please try again."))
+            bot_time = datetime.now().strftime("%H:%M")
+            st.session_state['chat_history'].append(("Bot", "Sorry, I couldn't generate a response. Please try again.", bot_time))
             
     except Exception as e:
         st.error(f"❌ Error: {e}")
-        st.session_state['chat_history'].append(("Bot", "I encountered an error. Please try again later."))
+        error_time = datetime.now().strftime("%H:%M")
+        st.session_state['chat_history'].append(("Bot", "I encountered an error. Please try again later.", error_time))
     
     # Increment message count
     st.session_state['message_count'] += 1
@@ -367,11 +369,11 @@ with st.sidebar:
         st.session_state['session_start'] = datetime.now()
         st.rerun()
     
-    if st.button("💾 Export Chat", use_container_width=True):
+    if st.button("📥 Export Chat", use_container_width=True):
         if st.session_state['chat_history']:
-            chat_export = "\n\n".join([f"{role}: {text}" for role, text in st.session_state['chat_history']])
+            chat_export = "\n\n".join([f"{role} ({timestamp}): {text}" for role, text, timestamp in st.session_state['chat_history']])
             st.download_button(
-                label="📥 Download Chat",
+                label="💾 Download Chat",
                 data=chat_export,
                 file_name=f"gemini_chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain",
